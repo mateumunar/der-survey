@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP DER Customer Survey</title>
+<style>
+  :root {
+    --sap-blue: #0070f2;
+    --sap-dark: #223548;
+    --sap-light: #f5f6fa;
+    --sap-border: #d1d5db;
+    --sap-green: #107e3e;
+    --sap-red: #bb0000;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "72", "72full", Arial, sans-serif;
+    background: var(--sap-light);
+    color: var(--sap-dark);
+    min-height: 100vh;
+  }
+  header {
+    background: var(--sap-dark);
+    color: #fff;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 1px; }
+  header .subtitle { font-size: 0.85rem; opacity: 0.75; }
+  .container {
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 16px 80px;
+  }
+  .card {
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--sap-border);
+    padding: 36px 40px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  }
+
+  /* Progress bar */
+  .progress-wrap { margin-bottom: 28px; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  .progress-bar-bg {
+    background: #e4e6ea;
+    border-radius: 99px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    background: var(--sap-blue);
+    height: 100%;
+    border-radius: 99px;
+    transition: width .35s ease;
+  }
+
+  /* Section badge */
+  .section-badge {
+    display: inline-block;
+    background: #e8f2ff;
+    color: var(--sap-blue);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 99px;
+    margin-bottom: 12px;
+  }
+
+  /* Question */
+  .q-number { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+  .q-title {
+    font-size: 1.08rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    line-height: 1.45;
+  }
+  .optional-tag {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 400;
+    margin-left: 8px;
+  }
+  .max-tag {
+    font-size: 0.78rem;
+    color: var(--sap-blue);
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .sub-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #444;
+    margin: 18px 0 10px;
+  }
+
+  /* Radio / checkbox options */
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 10px 14px;
+    border: 1.5px solid var(--sap-border);
+    border-radius: 8px;
+    transition: border-color .15s, background .15s;
+    user-select: none;
+  }
+  .option-item:hover { border-color: var(--sap-blue); background: #f0f6ff; }
+  .option-item.selected { border-color: var(--sap-blue); background: #e8f2ff; }
+  .option-item.disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+  .option-item input { margin-top: 2px; accent-color: var(--sap-blue); flex-shrink: 0; }
+  .option-text { font-size: 0.92rem; line-height: 1.4; }
+
+  /* Textarea */
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    font-size: 0.9rem;
+    border: 1.5px solid var(--sap-border);
+    border-radius: 8px;
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.5;
+    transition: border-color .15s;
+  }
+  textarea:focus { outline: none; border-color: var(--sap-blue); }
+
+  /* Name input */
+  .name-input-wrap { margin-bottom: 8px; }
+  .name-input-wrap label { display: block; font-weight: 600; margin-bottom: 8px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 1rem;
+    border: 1.5px solid var(--sap-border);
+    border-radius: 8px;
+    font-family: inherit;
+    transition: border-color .15s;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--sap-blue); }
+
+  /* Navigation buttons */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 32px;
+    gap: 12px;
+  }
+  .btn {
+    padding: 10px 28px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--sap-blue); color: #fff; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: transparent; color: var(--sap-blue); border: 1.5px solid var(--sap-blue); }
+  .btn-success { background: var(--sap-green); color: #fff; }
+
+  /* Welcome screen */
+  .welcome-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+  .welcome-sub { color: #555; margin-bottom: 28px; line-height: 1.6; }
+
+  /* Review screen */
+  .review-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--sap-blue);
+    margin: 24px 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #e8f2ff;
+  }
+  .review-item { margin-bottom: 14px; }
+  .review-q { font-size: 0.82rem; color: #666; margin-bottom: 3px; }
+  .review-a { font-size: 0.93rem; font-weight: 500; }
+
+  /* Thank you */
+  .thankyou-icon { font-size: 3rem; margin-bottom: 16px; }
+  .thankyou-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+  .thankyou-sub { color: #555; line-height: 1.6; }
+
+  /* Validation error */
+  .error-msg {
+    color: var(--sap-red);
+    font-size: 0.82rem;
+    margin-top: 8px;
+    display: none;
+  }
+  .error-msg.visible { display: block; }
+
+  /* Hidden screens */
+  .screen { display: none; }
+  .screen.active { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">SAP</div>
+    <div class="subtitle">Distributed Energy Resources</div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="card">
+
+    <!-- SCREEN 0: WELCOME -->
+    <div class="screen active" id="screen-welcome">
+      <div class="welcome-title">Customer Input Survey</div>
+      <div class="welcome-sub">
+        DER Capability Priorities &amp; Energy Data Management<br>
+        <em>Prepared for the ACCU in Munich, September 2026</em>
+      </div>
+      <div class="name-input-wrap">
+        <label for="respondent-name">Your name or nickname <span style="color:var(--sap-red)">*</span></label>
+        <input type="text" id="respondent-name" placeholder="e.g. Jane, UtilityTeam1…" autocomplete="off">
+      </div>
+      <div class="error-msg" id="name-error">Please enter your name or a nickname before continuing.</div>
+      <div class="nav-row" style="justify-content:flex-end">
+        <button class="btn btn-primary" onclick="startSurvey()">Start Survey &rarr;</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 1-11: QUESTIONS (generated by JS) -->
+    <div class="screen" id="screen-questions">
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span id="progress-text">Question 1 of 11</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div id="question-body"></div>
+      <div class="error-msg" id="q-error">Please answer this question before continuing.</div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" id="btn-back" onclick="prevQ()">&#8592; Back</button>
+        <button class="btn btn-primary" id="btn-next" onclick="nextQ()">Next &rarr;</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: REVIEW -->
+    <div class="screen" id="screen-review">
+      <h2 style="margin-bottom:6px">Review your answers</h2>
+      <p style="color:#666;font-size:.9rem;margin-bottom:4px">Please check everything looks correct before submitting.</p>
+      <div id="review-body"></div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="showQuestions(10)">&#8592; Edit answers</button>
+        <button class="btn btn-success" onclick="submitSurvey()">Submit &#10003;</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: THANK YOU -->
+    <div class="screen" id="screen-thankyou">
+      <div style="text-align:center;padding:20px 0">
+        <div class="thankyou-icon">&#10003;</div>
+        <div class="thankyou-title">Thank you!</div>
+        <div class="thankyou-sub">
+          Your response has been recorded.<br>
+          The results will be compiled into a summary report after the session.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Survey data ────────────────────────────────────────────────────────────
+const CAP10 = [
+  "Customer enrollment and DER program management, including incentives and onboarding",
+  "Device connectivity and protocol handling for EV chargers, batteries, heat pumps and solar",
+  "Demand side management and demand response execution",
+  "Energy data management (validated interval data, quality status, correction history, versioning, audit trail)",
+  "Virtual power plant and flexibility market participation",
+  "Energy communities and energy sharing",
+  "Modeling of complex prosumer installations (multiple assets, registers and directions behind a single connection point)",
+  "Grid capacity, congestion management and hosting capacity",
+  "Settlement, billing determinants and flexibility remuneration",
+  "Analytics and AI applied to energy data",
+];
+
+const QUESTIONS = [
+  {
+    id: "q1", section: "A. Classification",
+    title: "Which best describes your organization?",
+    type: "radio",
+    options: [
+      "Retail or supply business",
+      "Distribution network operator",
+      "Integrated utility, both network and retail",
+      "Generation, aggregator or flexibility service provider",
+      "Municipal utility or cooperative",
+      "Other",
+    ],
+  },
+  {
+    id: "q2", section: "A. Classification",
+    title: "In which market do you primarily operate, and what is your core system today?",
+    type: "compound",
+    subquestions: [
+      { key: "q2_region", label: "Region", options: ["Europe","North America","Asia Pacific and Japan","Latin America","Middle East and Africa"] },
+      { key: "q2_system", label: "Core system", options: ["SAP S/4HANA Utilities","SAP ECC","Non-SAP core","Ongoing transformation to SAP S/4HANA Utilities"] },
+    ],
+  },
+  {
+    id: "q3", section: "B. Priorities across the DER portfolio",
+    title: "Which THREE capabilities matter most to your business in the next 24 months?",
+    type: "checkbox", max: 3, options: CAP10,
+  },
+  {
+    id: "q4", section: "B. Priorities across the DER portfolio",
+    title: "Which THREE of those same capabilities will you solve WITHOUT SAP in the next 24 months?",
+    type: "checkbox", max: 3, options: CAP10,
+  },
+  {
+    id: "q5", section: "C. Energy data management specifically",
+    title: "Where does your validated interval energy data live today, and who controls it?",
+    type: "radio",
+    options: [
+      "SAP S/4HANA Utilities or SAP ECC ISU — classic energy data management",
+      "SAP Cloud for Energy",
+      "A meter data management system from our metering vendor",
+      "A specialist third-party energy data platform",
+      "Our own data lake or in-house build",
+      "Outsourced to a service provider",
+      "Not consolidated — it sits across several systems",
+    ],
+  },
+  {
+    id: "q6", section: "C. Energy data management specifically",
+    title: "Could you reproduce a settlement determination or network investment decision from two years ago — including the original reading, validation status, and correction history — from a system you control and without vendor cooperation?",
+    type: "radio",
+    options: [
+      "Yes, confidently and from a system we control",
+      "Yes, but it would take significant manual effort",
+      "Only with the cooperation of a software vendor or service provider",
+      "No",
+      "We have not tested this",
+    ],
+  },
+  {
+    id: "q7", section: "C. Energy data management specifically",
+    title: "How would you characterize the need for a governed enterprise record of energy data (validated interval data, quality status, versioning, audit trail)?",
+    type: "radio",
+    options: [
+      "Mandatory foundation — other DER capabilities do not work without it",
+      "Important, but it can follow other DER capabilities",
+      "Useful to have, not a priority",
+      "Already solved for us — not a gap",
+      "Not relevant to our business model",
+    ],
+  },
+  {
+    id: "q8", section: "C. Energy data management specifically",
+    title: "Regardless of what any vendor offers today, which THREE would be most valuable to you?",
+    type: "checkbox", max: 3,
+    options: [
+      "Modeling of energy types at register level (consumed, produced, stored, active and reactive)",
+      "Near real-time ingestion of smart meter data",
+      "Validation, estimation and interpolation with an explicit quality status on every value",
+      "Versioning, correction history and full audit trail",
+      "Definition of energy communities and calculation of flows between participants",
+      "Aggregation across assets, portfolios and communities",
+      "Price, weather and other non-energy series held in the same interval model",
+      "Forecasting and synthetic load profile management",
+      "Extensibility to apply our own estimation and forecasting logic",
+      "Energy settlement",
+      "Analytics and AI data products built on the governed record",
+    ],
+  },
+  {
+    id: "q9", section: "D. Ownership and timing",
+    title: "Where should this governed energy data record sit, and when do you need it?",
+    type: "compound",
+    subquestions: [
+      { key: "q9_placement", label: "Placement", options: [
+        "In the SAP enterprise platform",
+        "In a specialist partner solution integrated with SAP",
+        "In our own platform under our control",
+        "No preference — provided it is open and interoperable",
+      ]},
+      { key: "q9_timing", label: "Timing", options: [
+        "Within twelve months",
+        "Twelve to twenty-four months",
+        "Twenty-four to thirty-six months",
+        "No defined need",
+      ]},
+    ],
+  },
+  {
+    id: "q10", section: "D. Ownership and timing",
+    title: "What is the single DER capability you most need and do not have today, and what is stopping you from getting it?",
+    type: "text",
+  },
+  {
+    id: "q11", section: "Optional",
+    title: "How important is it that DER capability is available as a public cloud solution, independent of your core system upgrade timeline?",
+    type: "radio", optional: true,
+    options: [
+      "Essential — we will not take on a core dependency",
+      "Strongly preferred",
+      "Neutral",
+      "We would prefer it inside our existing core system",
+    ],
+  },
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let answers = {};
+let currentQ = 0;
+let respondentName = "";
+
+// ─── Screen helpers ──────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ─── Welcome ─────────────────────────────────────────────────────────────────
+function startSurvey() {
+  const nameEl = document.getElementById("respondent-name");
+  const err = document.getElementById("name-error");
+  const val = nameEl.value.trim();
+  if (!val) { err.classList.add("visible"); nameEl.focus(); return; }
+  err.classList.remove("visible");
+  respondentName = val;
+  showQuestions(0);
+}
+
+// ─── Question renderer ───────────────────────────────────────────────────────
+function showQuestions(index) {
+  currentQ = index;
+  showScreen("screen-questions");
+  renderQuestion(index);
+  document.getElementById("btn-back").style.visibility = index === 0 ? "hidden" : "visible";
+  document.getElementById("btn-next").textContent =
+    index === QUESTIONS.length - 1 ? "Review ›" : "Next →";
+  document.getElementById("q-error").classList.remove("visible");
+}
+
+function updateProgress(index) {
+  const total = QUESTIONS.length;
+  const pct = Math.round((index / total) * 100);
+  document.getElementById("progress-text").textContent = `Question ${index + 1} of ${total}`;
+  document.getElementById("progress-pct").textContent = `${pct}%`;
+  document.getElementById("progress-fill").style.width = `${pct}%`;
+}
+
+function renderQuestion(index) {
+  updateProgress(index);
+  const q = QUESTIONS[index];
+  const body = document.getElementById("question-body");
+
+  let html = `<div class="section-badge">${q.section}</div>`;
+  html += `<div class="q-number">Question ${index + 1} of ${QUESTIONS.length}</div>`;
+  html += `<div class="q-title">${q.title}${q.optional ? '<span class="optional-tag">(optional)</span>' : ''}</div>`;
+
+  if (q.type === "radio") {
+    html += renderRadio(q.id, q.options, answers[q.id]);
+  } else if (q.type === "checkbox") {
+    html += `<div class="max-tag">Select up to ${q.max}</div>`;
+    html += renderCheckbox(q.id, q.options, answers[q.id] || [], q.max);
+  } else if (q.type === "compound") {
+    for (const sub of q.subquestions) {
+      html += `<div class="sub-label">${sub.label}</div>`;
+      html += renderRadio(sub.key, sub.options, answers[sub.key]);
+    }
+  } else if (q.type === "text") {
+    const val = answers[q.id] || "";
+    html += `<textarea id="ta-${q.id}" placeholder="Your answer…">${val}</textarea>`;
+  }
+
+  body.innerHTML = html;
+
+  // Wire up events after render
+  if (q.type === "radio") wireRadio(q.id, q.options);
+  else if (q.type === "checkbox") wireCheckbox(q.id, q.options, q.max);
+  else if (q.type === "compound") {
+    for (const sub of q.subquestions) wireRadio(sub.key, sub.options);
+  }
+}
+
+function renderRadio(key, options, selected) {
+  let html = '<div class="options">';
+  for (const opt of options) {
+    const checked = selected === opt ? "checked" : "";
+    const sel = selected === opt ? " selected" : "";
+    html += `<label class="option-item${sel}">
+      <input type="radio" name="${key}" value="${opt}" ${checked}>
+      <span class="option-text">${opt}</span>
+    </label>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderCheckbox(key, options, selected, max) {
+  let html = '<div class="options">';
+  for (const opt of options) {
+    const checked = selected.includes(opt) ? "checked" : "";
+    const sel = selected.includes(opt) ? " selected" : "";
+    const dis = (selected.length >= max && !selected.includes(opt)) ? " disabled" : "";
+    html += `<label class="option-item${sel}${dis}">
+      <input type="checkbox" name="${key}" value="${opt}" ${checked}>
+      <span class="option-text">${opt}</span>
+    </label>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function wireRadio(key, options) {
+  document.querySelectorAll(`input[name="${key}"]`).forEach(input => {
+    input.addEventListener("change", () => {
+      answers[key] = input.value;
+      document.querySelectorAll(`input[name="${key}"]`).forEach(i => {
+        i.closest(".option-item").classList.toggle("selected", i.checked);
+      });
+    });
+  });
+}
+
+function wireCheckbox(key, options, max) {
+  document.querySelectorAll(`input[name="${key}"]`).forEach(input => {
+    input.addEventListener("change", () => {
+      const checked = [...document.querySelectorAll(`input[name="${key}"]:checked`)].map(i => i.value);
+      answers[key] = checked;
+      document.querySelectorAll(`input[name="${key}"]`).forEach(i => {
+        const item = i.closest(".option-item");
+        item.classList.toggle("selected", i.checked);
+        if (checked.length >= max && !i.checked) {
+          item.classList.add("disabled");
+          i.disabled = true;
+        } else {
+          item.classList.remove("disabled");
+          i.disabled = false;
+        }
+      });
+    });
+  });
+}
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+function prevQ() {
+  if (currentQ > 0) showQuestions(currentQ - 1);
+}
+
+function nextQ() {
+  const q = QUESTIONS[currentQ];
+
+  // Save textarea value
+  if (q.type === "text") {
+    answers[q.id] = document.getElementById(`ta-${q.id}`).value.trim();
+  }
+
+  // Validate
+  if (!q.optional) {
+    let valid = true;
+    if (q.type === "radio" && !answers[q.id]) valid = false;
+    else if (q.type === "checkbox" && (!answers[q.id] || answers[q.id].length === 0)) valid = false;
+    else if (q.type === "compound") {
+      for (const sub of q.subquestions) { if (!answers[sub.key]) { valid = false; break; } }
+    }
+    // text is optional in content but we don't block on it
+    if (!valid) {
+      document.getElementById("q-error").classList.add("visible");
+      return;
+    }
+  }
+  document.getElementById("q-error").classList.remove("visible");
+
+  if (currentQ < QUESTIONS.length - 1) {
+    showQuestions(currentQ + 1);
+  } else {
+    showReview();
+  }
+}
+
+// ─── Review ──────────────────────────────────────────────────────────────────
+function showReview() {
+  showScreen("screen-review");
+  const body = document.getElementById("review-body");
+  let html = "";
+  let lastSection = "";
+
+  for (let i = 0; i < QUESTIONS.length; i++) {
+    const q = QUESTIONS[i];
+    if (q.section !== lastSection) {
+      html += `<div class="review-section-title">${q.section}</div>`;
+      lastSection = q.section;
+    }
+    html += `<div class="review-item">`;
+    html += `<div class="review-q">Q${i+1}. ${q.title}</div>`;
+    if (q.type === "compound") {
+      for (const sub of q.subquestions) {
+        const val = answers[sub.key] || "<em>not answered</em>";
+        html += `<div class="review-a">${sub.label}: ${val}</div>`;
+      }
+    } else if (q.type === "checkbox") {
+      const vals = answers[q.id];
+      html += `<div class="review-a">${vals && vals.length ? vals.join("; ") : "<em>not answered</em>"}</div>`;
+    } else {
+      const val = answers[q.id];
+      html += `<div class="review-a">${val ? val : "<em>not answered</em>"}</div>`;
+    }
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+// ─── Submit ──────────────────────────────────────────────────────────────────
+async function submitSurvey() {
+  const payload = { name: respondentName, ...answers };
+  try {
+    const res = await fetch("/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      showScreen("screen-thankyou");
+    } else {
+      alert("Submission failed. Please try again.");
+    }
+  } catch (e) {
+    alert("Network error. Make sure the server is running.");
+  }
+}
+
+// ─── Enter key on welcome ────────────────────────────────────────────────────
+document.getElementById("respondent-name").addEventListener("keydown", e => {
+  if (e.key === "Enter") startSurvey();
+});
+</script>
+</body>
+</html>
