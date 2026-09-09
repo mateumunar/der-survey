@@ -124,6 +124,17 @@ def report():
                 row[2].text = f"{cnt/total*100:.0f}%"
             doc.add_paragraph()
 
+        # "Other" free-text entries
+        if q.get("other"):
+            other_entries = [(r.get("name", "Anonymous"), r.get(f"{qkey}_other", "")) for r in responses]
+            other_entries = [(n, v) for n, v in other_entries if v and v.strip()]
+            if other_entries:
+                doc.add_paragraph("Other (specified):")
+                for name, val in other_entries:
+                    p = doc.add_paragraph(style="List Bullet")
+                    p.add_run(f"{name}: ").bold = True
+                    p.add_run(val)
+
         # Sub-questions (Q2, Q9)
         for sub in q.get("subquestions", []):
             doc.add_paragraph(sub["label"], style="Intense Quote")
@@ -172,6 +183,9 @@ def report():
                     display = "; ".join(ans) if ans else "—"
                 else:
                     display = ans or "—"
+                other_val = r.get(f"{qkey}_other", "")
+                if other_val:
+                    display += f" (other: {other_val})"
                 p = doc.add_paragraph(style="List Bullet")
                 p.add_run(f"Q{qkey}: ").bold = True
                 p.add_run(display)
@@ -203,7 +217,9 @@ def _get_questions():
     ]
     return [
         {
-            "id": "q1", "title": "Which best describes your organization?", "type": "radio",
+            "id": "q1",
+            "title": "Which best describes your organization's primary business model? Select one.",
+            "type": "radio", "other": True,
             "options": [
                 "Retail or supply business",
                 "Distribution network operator",
@@ -214,28 +230,31 @@ def _get_questions():
             ],
         },
         {
-            "id": "q2", "title": "In which market do you primarily operate, and what is your core system today?",
-            "type": "compound",
-            "subquestions": [
-                {"key": "q2_region", "label": "Region",
-                 "options": ["Europe", "North America", "Asia Pacific and Japan", "Latin America", "Middle East and Africa"]},
-                {"key": "q2_system", "label": "Core system",
-                 "options": ["SAP S/4HANA Utilities", "SAP ECC", "Non-SAP core", "Ongoing transformation to SAP S/4HANA Utilities"]},
-            ],
-        },
-        {
-            "id": "q3", "title": "Which THREE capabilities matter most to your business in the next 24 months?",
-            "type": "checkbox", "max": 3, "options": cap10,
-        },
-        {
-            "id": "q4", "title": "Which THREE of those same capabilities will you solve WITHOUT SAP in the next 24 months?",
-            "type": "checkbox", "max": 3, "options": cap10,
-        },
-        {
-            "id": "q5", "title": "Where does your validated interval energy data live today, and who controls it?",
+            "id": "q2", "title": "In which market do you primarily operate?",
             "type": "radio",
+            "options": ["Europe", "North America", "Asia Pacific and Japan", "Latin America", "Middle East and Africa"],
+        },
+        {
+            "id": "q3", "title": "What is your core system today?",
+            "type": "radio",
+            "options": ["SAP S/4HANA Utilities", "SAP ECC IS-U", "Non-SAP core", "Ongoing transformation to SAP S/4HANA Utilities"],
+        },
+        {
+            "id": "q4",
+            "title": "Thinking about the next 24 months, which capabilities matter most to your business? Select up to three.",
+            "type": "checkbox", "max": 3, "options": cap10,
+        },
+        {
+            "id": "q5",
+            "title": "Which of those same capabilities do you expect to obtain primarily from an internal solution or a specialist provider rather than directly from SAP? Select up to three.",
+            "type": "checkbox", "max": 3, "options": cap10,
+        },
+        {
+            "id": "q6",
+            "title": "Where does your validated interval energy data live today, and who controls it? Select all that apply.",
+            "type": "checkbox", "max": 7,
             "options": [
-                "SAP S/4HANA Utilities or SAP ECC ISU — classic energy data management",
+                "SAP S/4HANA Utilities or SAP ECC IS-U",
                 "SAP Cloud for Energy",
                 "A meter data management system from our metering vendor",
                 "A specialist third-party energy data platform",
@@ -245,8 +264,8 @@ def _get_questions():
             ],
         },
         {
-            "id": "q6",
-            "title": "Could you reproduce a settlement determination or network investment decision from two years ago, including the original reading, validation status, and correction history — from a system you control?",
+            "id": "q7",
+            "title": "Could you reproduce a settlement determination or network investment decision from two years ago, including the original reading, validation status, and correction history — from a system you control and without vendor cooperation?",
             "type": "radio",
             "options": [
                 "Yes, confidently and from a system we control",
@@ -257,7 +276,7 @@ def _get_questions():
             ],
         },
         {
-            "id": "q7",
+            "id": "q8",
             "title": "How would you characterize the need for a governed enterprise record of energy data (validated interval data, quality status, versioning, audit trail)?",
             "type": "radio",
             "options": [
@@ -269,9 +288,9 @@ def _get_questions():
             ],
         },
         {
-            "id": "q8",
-            "title": "Regardless of what any vendor offers today, which THREE would be most valuable to you?",
-            "type": "checkbox", "max": 3,
+            "id": "q9",
+            "title": "Regardless of what any vendor offers today, which three of the following would be most valuable to you? Select up to three.",
+            "type": "checkbox", "max": 3, "other": True,
             "options": [
                 "Modeling of energy types at register level (consumed, produced, stored, active and reactive)",
                 "Near real-time ingestion of smart meter data",
@@ -280,46 +299,66 @@ def _get_questions():
                 "Definition of energy communities and calculation of flows between participants",
                 "Aggregation across assets, portfolios and communities",
                 "Price, weather and other non-energy series held in the same interval model",
-                "Forecasting and synthetic load profile management",
+                "Forecasting",
+                "Synthetic load profile management",
                 "Extensibility to apply our own estimation and forecasting logic",
+                "Billing determination",
                 "Energy settlement",
                 "Analytics and AI data products built on the governed record",
+                "Other, please specify",
             ],
         },
         {
-            "id": "q9", "title": "Where should this governed energy data record sit, and when do you need it?",
+            "id": "q10", "title": "Where should this governed energy data record sit, and when do you need it?",
             "type": "compound",
             "subquestions": [
-                {"key": "q9_placement", "label": "Placement",
-                 "options": [
-                     "In the SAP enterprise platform",
-                     "In a specialist partner solution integrated with SAP",
-                     "In our own platform under our control",
-                     "No preference — provided it is open and interoperable",
-                 ]},
-                {"key": "q9_timing", "label": "Timing",
-                 "options": [
-                     "Within twelve months",
-                     "Twelve to twenty-four months",
-                     "Twenty-four to thirty-six months",
-                     "No defined need",
-                 ]},
+                {"key": "q10_placement", "label": "Placement", "options": [
+                    "In the SAP enterprise platform",
+                    "In a specialist partner solution integrated with SAP",
+                    "In our own platform under our control",
+                    "No preference — provided it is open and interoperable",
+                ]},
+                {"key": "q10_timing", "label": "Timing", "options": [
+                    "Already needed or overdue",
+                    "Within twelve months",
+                    "Twelve to twenty-four months",
+                    "Twenty-four to thirty-six months",
+                    "No defined need",
+                ]},
             ],
-        },
-        {
-            "id": "q10",
-            "title": "What is the single DER capability you most need and do not have today, and what is stopping you from getting it?",
-            "type": "text",
         },
         {
             "id": "q11",
-            "title": "How important is it that DER capability is available as a public cloud solution, independent of your core system upgrade timeline?",
+            "title": "What is the single DER capability you most need and do not have today?",
+            "type": "text",
+        },
+        {
+            "id": "q12",
+            "title": "What is the main barrier preventing your organization from obtaining it?",
+            "type": "text",
+        },
+        {
+            "id": "q13",
+            "title": "How important is it that Energy Data Management capability can be deployed independently of your core-system upgrade timeline?",
             "type": "radio", "optional": True,
             "options": [
                 "Essential — we will not take on a core dependency",
-                "Strongly preferred",
+                "Very important",
+                "Important",
                 "Neutral",
-                "We would prefer it inside our existing core system",
+                "Not important",
+            ],
+        },
+        {
+            "id": "q14", "title": "What is your preferred deployment mode?",
+            "type": "radio", "optional": True, "other": True,
+            "options": [
+                "Public cloud",
+                "Private cloud",
+                "Within the existing core system",
+                "Independent platform integrated with the core system",
+                "No preference",
+                "Other",
             ],
         },
     ]
