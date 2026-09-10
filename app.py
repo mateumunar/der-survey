@@ -6,27 +6,72 @@ from flask import Flask, request, jsonify, render_template, send_file
 import io
 
 app = Flask(__name__)
-# /tmp is writable on Render (and most cloud platforms); fall back to local dir
-_data_dir = "/tmp" if os.path.isdir("/tmp") else os.path.dirname(__file__)
-RESPONSES_FILE = os.path.join(_data_dir, "responses.json")
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# ── Database helpers ──────────────────────────────────────────────────────────
+
+def _get_conn():
+    import psycopg2
+    url = DATABASE_URL
+    # Render provides postgres:// but psycopg2 needs postgresql://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return psycopg2.connect(url)
+
+
+def _ensure_table():
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS responses (
+                    id SERIAL PRIMARY KEY,
+                    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    data JSONB NOT NULL
+                )
+            """)
+        conn.commit()
 
 
 def load_responses():
-    if not os.path.exists(RESPONSES_FILE):
-        return []
-    with open(RESPONSES_FILE, "r", encoding="utf-8") as f:
+    if not DATABASE_URL:
+        # Local fallback — file based
+        path = os.path.join(os.path.dirname(__file__), "responses.json")
+        if not os.path.exists(path):
+            return []
         try:
-            return json.load(f)
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
         except json.JSONDecodeError:
             return []
 
+    _ensure_table()
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM responses ORDER BY submitted_at ASC")
+            return [row[0] for row in cur.fetchall()]
+
 
 def save_response(entry):
-    responses = load_responses()
-    responses.append(entry)
-    with open(RESPONSES_FILE, "w", encoding="utf-8") as f:
-        json.dump(responses, f, ensure_ascii=False, indent=2)
+    if not DATABASE_URL:
+        path = os.path.join(os.path.dirname(__file__), "responses.json")
+        rows = load_responses()
+        rows.append(entry)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False, indent=2)
+        return
 
+    _ensure_table()
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO responses (submitted_at, data) VALUES (%s, %s)",
+                (entry.get("submitted_at", datetime.now().isoformat()), json.dumps(entry))
+            )
+        conn.commit()
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -51,13 +96,11 @@ def responses_raw():
 @app.route("/report")
 def report():
     from docx import Document
-    from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
 
     responses = load_responses()
     doc = Document()
 
-    # Title
     title = doc.add_heading("SAP DER Customer Survey – Summary Report", level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph(
@@ -75,10 +118,9 @@ def report():
                          download_name="DER_Survey_Report.docx",
                          mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-    # ── Section 1: Summary statistics ─────────────────────────────────────
     doc.add_heading("Section 1 – Aggregate Results", level=1)
-
     questions = _get_questions()
+
     for q in questions:
         doc.add_heading(f"{q['id']}. {q['title']}", level=2)
         qkey = q["id"]
@@ -108,28 +150,22 @@ def report():
                 elif ans and ans in counts:
                     counts[ans] += 1
 
-        # Table: option | count | %
         if counts:
             total = len(responses)
             table = doc.add_table(rows=1, cols=3)
             table.style = "Table Grid"
             hdr = table.rows[0].cells
-            hdr[0].text = "Option"
-            hdr[1].text = "Count"
-            hdr[2].text = "%"
+            hdr[0].text = "Option"; hdr[1].text = "Count"; hdr[2].text = "%"
             for cell in hdr:
                 for run in cell.paragraphs[0].runs:
                     run.bold = True
-
-            sorted_opts = sorted(counts.items(), key=lambda x: -x[1])
-            for opt, cnt in sorted_opts:
+            for opt, cnt in sorted(counts.items(), key=lambda x: -x[1]):
                 row = table.add_row().cells
                 row[0].text = opt
                 row[1].text = str(cnt)
                 row[2].text = f"{cnt/total*100:.0f}%"
             doc.add_paragraph()
 
-        # "Other" free-text entries
         if q.get("other"):
             other_entries = [(r.get("name", "Anonymous"), r.get(f"{qkey}_other", "")) for r in responses]
             other_entries = [(n, v) for n, v in other_entries if v and v.strip()]
@@ -140,12 +176,9 @@ def report():
                     p.add_run(f"{name}: ").bold = True
                     p.add_run(val)
 
-        # Sub-questions (Q2, Q9)
         for sub in q.get("subquestions", []):
             doc.add_paragraph(sub["label"], style="Intense Quote")
-            sub_counts = {}
-            for opt in sub["options"]:
-                sub_counts[opt] = 0
+            sub_counts = {opt: 0 for opt in sub["options"]}
             for r in responses:
                 ans = r.get(sub["key"])
                 if ans and ans in sub_counts:
@@ -164,7 +197,6 @@ def report():
                 row[2].text = f"{cnt/total*100:.0f}%"
             doc.add_paragraph()
 
-    # ── Section 2: Individual responses ───────────────────────────────────
     doc.add_page_break()
     doc.add_heading("Section 2 – Individual Responses", level=1)
 
@@ -200,8 +232,7 @@ def report():
     doc.save(buf)
     buf.seek(0)
     return send_file(
-        buf,
-        as_attachment=True,
+        buf, as_attachment=True,
         download_name="DER_Survey_Report.docx",
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
@@ -226,22 +257,18 @@ def _get_questions():
             "title": "Which best describes your organization's primary business model? Select one.",
             "type": "radio", "other": True,
             "options": [
-                "Retail or supply business",
-                "Distribution network operator",
+                "Retail or supply business", "Distribution network operator",
                 "Integrated utility, both network and retail",
                 "Generation, aggregator or flexibility service provider",
-                "Municipal utility or cooperative",
-                "Other",
+                "Municipal utility or cooperative", "Other",
             ],
         },
         {
-            "id": "q2", "title": "In which market do you primarily operate?",
-            "type": "radio",
+            "id": "q2", "title": "In which market do you primarily operate?", "type": "radio",
             "options": ["Europe", "North America", "Asia Pacific and Japan", "Latin America", "Middle East and Africa"],
         },
         {
-            "id": "q3", "title": "What is your core system today?",
-            "type": "radio",
+            "id": "q3", "title": "What is your core system today?", "type": "radio",
             "options": ["SAP S/4HANA Utilities", "SAP ECC IS-U", "Non-SAP core", "Ongoing transformation to SAP S/4HANA Utilities"],
         },
         {
@@ -259,12 +286,10 @@ def _get_questions():
             "title": "Where does your validated interval energy data live today, and who controls it? Select all that apply.",
             "type": "checkbox", "max": 7,
             "options": [
-                "SAP S/4HANA Utilities or SAP ECC IS-U",
-                "SAP Cloud for Energy",
+                "SAP S/4HANA Utilities or SAP ECC IS-U", "SAP Cloud for Energy",
                 "A meter data management system from our metering vendor",
                 "A specialist third-party energy data platform",
-                "Our own data lake or in-house build",
-                "Outsourced to a service provider",
+                "Our own data lake or in-house build", "Outsourced to a service provider",
                 "Not consolidated — it sits across several systems",
             ],
         },
@@ -276,8 +301,7 @@ def _get_questions():
                 "Yes, confidently and from a system we control",
                 "Yes, but it would take significant manual effort",
                 "Only with the cooperation of a software vendor or service provider",
-                "No",
-                "We have not tested this",
+                "No", "We have not tested this",
             ],
         },
         {
@@ -287,8 +311,7 @@ def _get_questions():
             "options": [
                 "Mandatory foundation — other DER capabilities do not work without it",
                 "Important, but it can follow other DER capabilities",
-                "Useful to have, not a priority",
-                "Already solved for us — not a gap",
+                "Useful to have, not a priority", "Already solved for us — not a gap",
                 "Not relevant to our business model",
             ],
         },
@@ -304,11 +327,9 @@ def _get_questions():
                 "Definition of energy communities and calculation of flows between participants",
                 "Aggregation across assets, portfolios and communities",
                 "Price, weather and other non-energy series held in the same interval model",
-                "Forecasting",
-                "Synthetic load profile management",
+                "Forecasting", "Synthetic load profile management",
                 "Extensibility to apply our own estimation and forecasting logic",
-                "Billing determination",
-                "Energy settlement",
+                "Billing determination", "Energy settlement",
                 "Analytics and AI data products built on the governed record",
                 "Other, please specify",
             ],
@@ -324,46 +345,26 @@ def _get_questions():
                     "No preference — provided it is open and interoperable",
                 ]},
                 {"key": "q10_timing", "label": "Timing", "options": [
-                    "Already needed or overdue",
-                    "Within twelve months",
-                    "Twelve to twenty-four months",
-                    "Twenty-four to thirty-six months",
+                    "Already needed or overdue", "Within twelve months",
+                    "Twelve to twenty-four months", "Twenty-four to thirty-six months",
                     "No defined need",
                 ]},
             ],
         },
-        {
-            "id": "q11",
-            "title": "What is the single DER capability you most need and do not have today?",
-            "type": "text",
-        },
-        {
-            "id": "q12",
-            "title": "What is the main barrier preventing your organization from obtaining it?",
-            "type": "text",
-        },
+        {"id": "q11", "title": "What is the single DER capability you most need and do not have today?", "type": "text"},
+        {"id": "q12", "title": "What is the main barrier preventing your organization from obtaining it?", "type": "text"},
         {
             "id": "q13",
             "title": "How important is it that Energy Data Management capability can be deployed independently of your core-system upgrade timeline?",
             "type": "radio", "optional": True,
-            "options": [
-                "Essential — we will not take on a core dependency",
-                "Very important",
-                "Important",
-                "Neutral",
-                "Not important",
-            ],
+            "options": ["Essential — we will not take on a core dependency", "Very important", "Important", "Neutral", "Not important"],
         },
         {
             "id": "q14", "title": "What is your preferred deployment mode?",
             "type": "radio", "optional": True, "other": True,
             "options": [
-                "Public cloud",
-                "Private cloud",
-                "Within the existing core system",
-                "Independent platform integrated with the core system",
-                "No preference",
-                "Other",
+                "Public cloud", "Private cloud", "Within the existing core system",
+                "Independent platform integrated with the core system", "No preference", "Other",
             ],
         },
     ]
