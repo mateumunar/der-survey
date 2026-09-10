@@ -43,6 +43,11 @@ def submit():
     return jsonify({"ok": True})
 
 
+@app.route("/responses")
+def responses_raw():
+    return jsonify(load_responses())
+
+
 @app.route("/report")
 def report():
     from docx import Document
